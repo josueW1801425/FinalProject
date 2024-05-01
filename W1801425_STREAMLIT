@@ -1,0 +1,78 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import joblib
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import linear_kernel
+from textblob import TextBlob
+
+# Load saved models
+travel_tfidf_vectorizer = joblib.load('travel_tfidf_vectorizer.joblib')
+travel_cosine_similarity_df = joblib.load('travel_cosine_similarity_df.joblib')
+travel_tfidf_matrix = joblib.load('travel_tfidf_matrix.joblib')  # Load the TF-IDF matrix
+
+restaurant_tfidf_vectorizer = joblib.load('restaurant_tfidf_vectorizer.joblib')
+restaurant_cosine_similarity_df = joblib.load('restaurant_cosine_similarity_df.joblib')
+restaurant_tfidf_matrix = joblib.load('restaurant_tfidf_matrix.joblib')  # Load the TF-IDF matrix
+
+# Load data
+clean_travel_df = pd.read_excel("clean_travel_data.xlsx")
+clean_restaurants_df = pd.read_excel("clean_restaurants_data.xlsx")
+booking_data = pd.read_excel('processed_booking_data.xlsx')
+
+# Function to perform sentiment analysis using TextBlob
+def analyze_sentiment(text):
+    analysis = TextBlob(text)
+    # Classify the polarity as positive, negative, or neutral
+    return 'positive' if analysis.sentiment.polarity > 0 else 'negative' if analysis.sentiment.polarity < 0 else 'neutral'
+
+# Streamlit App
+st.title('Travel Recommendation App')
+
+# Sidebar with user input
+user_input = st.text_area('Enter your preferences:', '30 female hotel car')
+
+# Travel Recommendations
+st.header('Travel Recommendations')
+if st.button('Get Travel Recommendations'):
+    # Transform the user input into a TF-IDF vector
+    user_input_vector = travel_tfidf_vectorizer.transform([user_input])
+
+    # Calculate cosine similarity with existing destinations
+    cosine_similarities = linear_kernel(user_input_vector, travel_tfidf_matrix).flatten()
+
+    # Get indices of similar destinations
+    similar_destinations_indices = cosine_similarities.argsort()[:-6:-1]
+
+    # Get the recommended destinations
+    recommended_destinations = clean_travel_df.iloc[similar_destinations_indices]['Destination'].tolist()
+
+    # Display recommendations
+    st.write(recommended_destinations)
+
+# Restaurant Recommendations
+st.header('Restaurant Recommendations')
+if st.button('Get Restaurant Recommendations'):
+    # Transform the user input into a TF-IDF vector
+    user_input_vector = restaurant_tfidf_vectorizer.transform([user_input])
+
+    # Calculate the cosine similarity between the user input and restaurants in the dataset
+    cosine_similarities = linear_kernel(user_input_vector, restaurant_tfidf_matrix).flatten()
+
+    # Get indices of similar restaurants
+    similar_restaurants_indices = cosine_similarities.argsort()[:-6:-1]
+
+    # Get the recommended restaurants
+    recommended_restaurants = clean_restaurants_df.iloc[similar_restaurants_indices]['restaurant_name'].tolist()
+
+    # Display recommendations
+    st.write(recommended_restaurants)
+
+# Sentiment Analysis
+st.header('Sentiment Analysis')
+if st.button('Analyze Sentiment'):
+    # Apply sentiment analysis to the user input
+    user_input_sentiment = analyze_sentiment(user_input)
+
+    # Display sentiment analysis result
+    st.write(f'Sentiment: {user_input_sentiment}')
